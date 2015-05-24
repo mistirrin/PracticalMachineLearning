@@ -1,0 +1,123 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "Daniel Perez"
+output: "word_document"
+---
+
+Practical Machine Learningg
+========================================================
+## Course Project
+By Daniel Perez
+
+#Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+Ourg goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to create a model that can correctly predict how well an individual is doing an activity based on the input of said devices. 
+
+The data was gathered after the participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har. 
+
+#Cleaning and processing the data.
+
+To build the model we will need to load some libraries.
+
+```{r Libraries, warning = FALSE, message=FALSE}
+library(xtable)
+library(dplyr)
+library(ggplot2)
+library(caret)
+library(rpart)
+library(randomForest)
+```
+
+Next let's set the seed to ensure reproducibility.
+
+```{r Seed, warning = FALSE, message=FALSE}
+set.seed(2015)
+```
+
+We'll have to download the files (stored as a csv) and load them as data frames **preTrain** and **preTest** for unprocessed Training and Test data. We will consider *empty* values, *NA*s and *#DIV/0!* as NA values.
+
+```{r Data, warning = FALSE, message=FALSE}
+trainDataURL<- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(trainDataURL, destfile = "./Data/pml-training.csv")
+testDataURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(testDataURL, destfile = "./Data/pml-testing.csv")
+
+preTrain <- read.csv("./Data/pml-training.csv", na.strings=c("NA","#DIV/0!", ""))
+preTest <- read.csv("./Data/pml-testing.csv", na.strings=c("NA","#DIV/0!", ""))
+```
+
+Let's see if there are any columns with a considerable amount of NA values. The more NA values we have in our data, the more we will have to impute and the more our results may differ from the actual population. We will consider a column (*predictor*) as having too many NAs whenever the percentage of NAs is above 50%.
+
+```{r NA-Analysis}
+#kable(sapply(preTrain, function(x) {sum(is.na(x))/dim(preTrain)[1]*100}))
+percentageOfNAs <- colSums(is.na(preTrain))/dim(preTrain)[1]*100
+as.table(percentageOfNAs)[sample(x=1:dim(preTrain)[2], size=20, replace=FALSE)]
+
+sum(percentageOfNAs >= 50)
+```
+
+There are *`r sum(percentageOfNAs >= 50)`* predictors with a majority of NAs.
+
+Let's clean the dataset by removing other columns that won't contribute to our model.
+
+* Let's remove columns that pertain to data aqcuisition (*row ids*, *timestamps*, etc.).
+```{r Clean1}
+train <- preTrain[,-c(1,2,3,4,5,6,7)]
+```
+* Now we shall remove the columns with a significant amount of NAs.
+```{r Clean2}
+train <- train[,!(colSums(is.na(train))/dim(train)[1]*100 > 50)]
+```
+* Finally to speed up our training, let's identify those columns that offer little to no variation and remove them from the dataset.
+```{r Clean3}
+train <- train[,-(nearZeroVar(preTrain))]
+```
+
+Now that we have cleaned the training data set, we should make sure that the test data set has the same columns as the training one.
+```{r CleanTest}
+test <- preTest[,as.vector(names(train))]
+```
+
+While removing the columns with little variation from the training data set, we removed the **classe** variable which is what we want to predict so now we have to add it.
+```{r Clean4}
+train$classe <- preTrain$classe
+```
+
+#Cross validation.
+To cross validate our model, we will have to split our training data set. This will ensure that our model generalizes well and does not suffer from overfitting (*low-variance*).
+
+The training data set will be split into training (*tr*) and a cross-validating (*cr*) datasets holding 70% and 30% of the training data respectively.
+
+```{r Partition}
+t <- createDataPartition(y = train$classe, p=0.7, list=FALSE)
+tr <- train[t,]
+cv <- train[-t,]
+```
+
+#Building a model. 
+Let's the *random forest* Machine Learning algorithm to create our model. Since there's a lot of data and our algorithm works by generating a bunch of decision trees (*bagging*), we expect the training time to be lengthy. Let's try to reduce the time by allowing parallel computation.
+
+```{r Model,  cache = TRUE}
+mfrf <- train(classe ~ ., data = tr, method = "rf", 
+              prof = TRUE, 
+              trControl = trainControl(method = "cv", number = 4, allowParallel = TRUE))
+mfrf$finalModel
+```
+
+From the model we can get the five predictors that contribute with the most variance. Let's plot them on a feature plot and see if there's any trend.
+
+```{r MainVars}
+mainV <- row.names(varImp(mfrf)[[1]])[1:5]
+
+fp <- featurePlot(x = tr[,mainV], y = tr$classe, plot="pairs", auto.key = list(columns = 5))
+print(fp)
+```
+Finally, with our model, let's try to predic the values of the cross validation set and compare them with the actual values, creating a confusion matrix.
+
+```{r CrossValidation}
+confusionMatrix(predict(mfrf,cv), cv$classe)
+```
+As we can see the accuracy is *`r confusionMatrix(predict(mfrf,cv), cv$classe)$overall[1]`*.
+
+Now we can go on and use this model to predict future values when given a set of predictors.
