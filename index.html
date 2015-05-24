@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Practicalmachinelearning by mistirrin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Practicalmachinelearning</h1>
+      <h2 class="project-tagline">Course-Project</h2>
+      <a href="https://github.com/mistirrin/PracticalMachineLearning" class="btn">View on GitHub</a>
+      <a href="https://github.com/mistirrin/PracticalMachineLearning/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/mistirrin/PracticalMachineLearning/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <h1>
+<a id="practical-machine-learningg" class="anchor" href="#practical-machine-learningg" aria-hidden="true"><span class="octicon octicon-link"></span></a>Practical Machine Learningg</h1>
+
+<h2>
+<a id="course-project" class="anchor" href="#course-project" aria-hidden="true"><span class="octicon octicon-link"></span></a>Course Project</h2>
+
+<p>By Daniel Perez</p>
+
+<h1>
+<a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span class="octicon octicon-link"></span></a>Introduction</h1>
+
+<p>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. </p>
+
+<p>Ourg goal is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to create a model that can correctly predict how well an individual is doing an activity based on the input of said devices. </p>
+
+<p>The data was gathered after the participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <a href="http://groupware.les.inf.puc-rio.br/har">http://groupware.les.inf.puc-rio.br/har</a>. </p>
+
+<h1>
+<a id="cleaning-and-processing-the-data" class="anchor" href="#cleaning-and-processing-the-data" aria-hidden="true"><span class="octicon octicon-link"></span></a>Cleaning and processing the data.</h1>
+
+<p>To build the model we will need to load some libraries.</p>
+
+<div class="highlight highlight-r"><pre>library(<span class="pl-smi">xtable</span>)
+library(<span class="pl-smi">dplyr</span>)
+library(<span class="pl-smi">ggplot2</span>)
+library(<span class="pl-smi">caret</span>)
+library(<span class="pl-smi">rpart</span>)
+library(<span class="pl-smi">randomForest</span>)</pre></div>
+
+<p>Next let's set the seed to ensure reproducibility.</p>
+
+<div class="highlight highlight-r"><pre>set.seed(<span class="pl-c1">2015</span>)</pre></div>
+
+<p>We'll have to download the files (stored as a csv) and load them as data frames <strong>preTrain</strong> and <strong>preTest</strong> for unprocessed Training and Test data. We will consider <em>empty</em> values, <em>NA</em>s and <em>#DIV/0!</em> as NA values.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">trainDataURL</span><span class="pl-k">&lt;-</span> <span class="pl-s"><span class="pl-pds">"</span>https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv<span class="pl-pds">"</span></span>
+download.file(<span class="pl-smi">trainDataURL</span>, <span class="pl-v">destfile</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>./Data/pml-training.csv<span class="pl-pds">"</span></span>)</pre></div>
+
+<pre><code>## Error in download.file(trainDataURL, destfile = "./Data/pml-training.csv"): unsupported URL scheme
+</code></pre>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">testDataURL</span> <span class="pl-k">&lt;-</span> <span class="pl-s"><span class="pl-pds">"</span>https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv<span class="pl-pds">"</span></span>
+download.file(<span class="pl-smi">testDataURL</span>, <span class="pl-v">destfile</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>./Data/pml-testing.csv<span class="pl-pds">"</span></span>)</pre></div>
+
+<pre><code>## Error in download.file(testDataURL, destfile = "./Data/pml-testing.csv"): unsupported URL scheme
+</code></pre>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">preTrain</span> <span class="pl-k">&lt;-</span> read.csv(<span class="pl-s"><span class="pl-pds">"</span>./Data/pml-training.csv<span class="pl-pds">"</span></span>, <span class="pl-v">na.strings</span><span class="pl-k">=</span>c(<span class="pl-s"><span class="pl-pds">"</span>NA<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span>#DIV/0!<span class="pl-pds">"</span></span>, <span class="pl-s"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>))
+<span class="pl-smi">preTest</span> <span class="pl-k">&lt;-</span> read.csv(<span class="pl-s"><span class="pl-pds">"</span>./Data/pml-testing.csv<span class="pl-pds">"</span></span>, <span class="pl-v">na.strings</span><span class="pl-k">=</span>c(<span class="pl-s"><span class="pl-pds">"</span>NA<span class="pl-pds">"</span></span>,<span class="pl-s"><span class="pl-pds">"</span>#DIV/0!<span class="pl-pds">"</span></span>, <span class="pl-s"><span class="pl-pds">"</span><span class="pl-pds">"</span></span>))</pre></div>
+
+<p>Let's see if there are any columns with a considerable amount of NA values. The more NA values we have in our data, the more we will have to impute and the more our results may differ from the actual population. We will consider a column (<em>predictor</em>) as having too many NAs whenever the percentage of NAs is above 50%.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-c">#kable(sapply(preTrain, function(x) {sum(is.na(x))/dim(preTrain)[1]*100}))</span>
+<span class="pl-smi">percentageOfNAs</span> <span class="pl-k">&lt;-</span> colSums(is.na(<span class="pl-smi">preTrain</span>))<span class="pl-k">/</span>dim(<span class="pl-smi">preTrain</span>)[<span class="pl-c1">1</span>]<span class="pl-k">*</span><span class="pl-c1">100</span>
+as.table(<span class="pl-smi">percentageOfNAs</span>)[sample(<span class="pl-v">x</span><span class="pl-k">=</span><span class="pl-c1">1</span><span class="pl-k">:</span>dim(<span class="pl-smi">preTrain</span>)[<span class="pl-c1">2</span>], <span class="pl-v">size</span><span class="pl-k">=</span><span class="pl-c1">20</span>, <span class="pl-v">replace</span><span class="pl-k">=</span><span class="pl-c1">FALSE</span>)]</pre></div>
+
+<pre><code>##                 yaw_belt         min_roll_forearm                  yaw_arm 
+##                  0.00000                 97.93089                  0.00000 
+##           cvtd_timestamp           min_pitch_belt         stddev_pitch_arm 
+##                  0.00000                 97.93089                 97.93089 
+##              max_yaw_arm       kurtosis_roll_belt amplitude_pitch_dumbbell 
+##                 97.93089                 97.98186                 97.93089 
+##             min_roll_arm        var_roll_dumbbell              var_yaw_arm 
+##                 97.93089                 97.93089                 97.93089 
+##         magnet_forearm_x              gyros_arm_y       var_pitch_dumbbell 
+##                  0.00000                  0.00000                 97.93089 
+##   skewness_pitch_forearm             gyros_belt_z         total_accel_belt 
+##                 98.36408                  0.00000                  0.00000 
+##         accel_dumbbell_x            avg_pitch_arm 
+##                  0.00000                 97.93089
+</code></pre>
+
+<div class="highlight highlight-r"><pre>sum(<span class="pl-smi">percentageOfNAs</span> <span class="pl-k">&gt;</span><span class="pl-k">=</span> <span class="pl-c1">50</span>)</pre></div>
+
+<pre><code>## [1] 100
+</code></pre>
+
+<p>There are <em>100</em> predictors with a majority of NAs.</p>
+
+<p>Let's clean the dataset by removing other columns that won't contribute to our model.</p>
+
+<ul>
+<li>Let's remove columns that pertain to data aqcuisition (<em>row ids</em>, <em>timestamps</em>, etc.).</li>
+</ul>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">train</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">preTrain</span>[,<span class="pl-k">-</span>c(<span class="pl-c1">1</span>,<span class="pl-c1">2</span>,<span class="pl-c1">3</span>,<span class="pl-c1">4</span>,<span class="pl-c1">5</span>,<span class="pl-c1">6</span>,<span class="pl-c1">7</span>)]</pre></div>
+
+<ul>
+<li>Now we shall remove the columns with a significant amount of NAs.</li>
+</ul>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">train</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">train</span>[,<span class="pl-k">!</span>(colSums(is.na(<span class="pl-smi">train</span>))<span class="pl-k">/</span>dim(<span class="pl-smi">train</span>)[<span class="pl-c1">1</span>]<span class="pl-k">*</span><span class="pl-c1">100</span> <span class="pl-k">&gt;</span> <span class="pl-c1">50</span>)]</pre></div>
+
+<ul>
+<li>Finally to speed up our training, let's identify those columns that offer little to no variation and remove them from the dataset.</li>
+</ul>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">train</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">train</span>[,<span class="pl-k">-</span>(nearZeroVar(<span class="pl-smi">preTrain</span>))]</pre></div>
+
+<p>Now that we have cleaned the training data set, we should make sure that the test data set has the same columns as the training one.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">test</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">preTest</span>[,as.vector(names(<span class="pl-smi">train</span>))]</pre></div>
+
+<p>While removing the columns with little variation from the training data set, we removed the <strong>classe</strong> variable which is what we want to predict so now we have to add it.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">train</span><span class="pl-k">$</span><span class="pl-smi">classe</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">preTrain</span><span class="pl-k">$</span><span class="pl-smi">classe</span></pre></div>
+
+<h1>
+<a id="cross-validation" class="anchor" href="#cross-validation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Cross validation.</h1>
+
+<p>To cross validate our model, we will have to split our training data set. This will ensure that our model generalizes well and does not suffer from overfitting (<em>low-variance</em>).</p>
+
+<p>The training data set will be split into training (<em>tr</em>) and a cross-validating (<em>cr</em>) datasets holding 70% and 30% of the training data respectively.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">t</span> <span class="pl-k">&lt;-</span> createDataPartition(<span class="pl-v">y</span> <span class="pl-k">=</span> <span class="pl-smi">train</span><span class="pl-k">$</span><span class="pl-smi">classe</span>, <span class="pl-v">p</span><span class="pl-k">=</span><span class="pl-c1">0.7</span>, <span class="pl-v">list</span><span class="pl-k">=</span><span class="pl-c1">FALSE</span>)
+<span class="pl-smi">tr</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">train</span>[<span class="pl-smi">t</span>,]
+<span class="pl-smi">cv</span> <span class="pl-k">&lt;-</span> <span class="pl-smi">train</span>[<span class="pl-k">-</span><span class="pl-smi">t</span>,]</pre></div>
+
+<h1>
+<a id="building-a-model" class="anchor" href="#building-a-model" aria-hidden="true"><span class="octicon octicon-link"></span></a>Building a model.</h1>
+
+<p>Let's the <em>random forest</em> Machine Learning algorithm to create our model. Since there's a lot of data and our algorithm works by generating a bunch of decision trees (<em>bagging</em>), we expect the training time to be lengthy. Let's try to reduce the time by allowing parallel computation.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">mfrf</span> <span class="pl-k">&lt;-</span> train(<span class="pl-smi">classe</span> <span class="pl-k">~</span> ., <span class="pl-v">data</span> <span class="pl-k">=</span> <span class="pl-smi">tr</span>, <span class="pl-v">method</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>rf<span class="pl-pds">"</span></span>, 
+              <span class="pl-v">prof</span> <span class="pl-k">=</span> <span class="pl-c1">TRUE</span>, 
+              <span class="pl-v">trControl</span> <span class="pl-k">=</span> trainControl(<span class="pl-v">method</span> <span class="pl-k">=</span> <span class="pl-s"><span class="pl-pds">"</span>cv<span class="pl-pds">"</span></span>, <span class="pl-v">number</span> <span class="pl-k">=</span> <span class="pl-c1">4</span>, <span class="pl-v">allowParallel</span> <span class="pl-k">=</span> <span class="pl-c1">TRUE</span>))
+<span class="pl-smi">mfrf</span><span class="pl-k">$</span><span class="pl-smi">finalModel</span></pre></div>
+
+<pre><code>## 
+## Call:
+##  randomForest(x = x, y = y, mtry = param$mtry, prof = TRUE) 
+##                Type of random forest: classification
+##                      Number of trees: 500
+## No. of variables tried at each split: 24
+## 
+##         OOB estimate of  error rate: 0.81%
+## Confusion matrix:
+##      A    B    C    D    E class.error
+## A 3900    4    2    0    0 0.001536098
+## B   21 2626   11    0    0 0.012039127
+## C    0   14 2374    8    0 0.009181970
+## D    0    2   27 2222    1 0.013321492
+## E    0    0    8    8 1884 0.008421053
+</code></pre>
+
+<p>From the model we can get the five predictors that contribute with the most variance. Let's plot them on a feature plot and see if there's any trend.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-smi">mainV</span> <span class="pl-k">&lt;-</span> row.names(varImp(<span class="pl-smi">mfrf</span>)[[<span class="pl-c1">1</span>]])[<span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-c1">5</span>]
+
+<span class="pl-smi">fp</span> <span class="pl-k">&lt;-</span> featurePlot(<span class="pl-v">x</span> <span class="pl-k">=</span> <span class="pl-smi">tr</span>[,<span class="pl-smi">mainV</span>], <span class="pl-v">y</span> <span class="pl-k">=</span> <span class="pl-smi">tr</span><span class="pl-k">$</span><span class="pl-smi">classe</span>, <span class="pl-v">plot</span><span class="pl-k">=</span><span class="pl-s"><span class="pl-pds">"</span>pairs<span class="pl-pds">"</span></span>, <span class="pl-v">auto.key</span> <span class="pl-k">=</span> <span class="pl-k">list</span>(<span class="pl-v">columns</span> <span class="pl-k">=</span> <span class="pl-c1">5</span>))
+print(<span class="pl-smi">fp</span>)</pre></div>
+
+<p><img src="figure/MainVars-1.png" alt="plot of chunk MainVars"> 
+Finally, with our model, let's try to predic the values of the cross validation set and compare them with the actual values, creating a confusion matrix.</p>
+
+<div class="highlight highlight-r"><pre>confusionMatrix(predict(<span class="pl-smi">mfrf</span>,<span class="pl-smi">cv</span>), <span class="pl-smi">cv</span><span class="pl-k">$</span><span class="pl-smi">classe</span>)</pre></div>
+
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1671    8    0    0    0
+##          B    2 1127    3    0    3
+##          C    0    4 1018    9   22
+##          D    0    0    5  955    0
+##          E    1    0    0    0 1057
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9903          
+##                  95% CI : (0.9875, 0.9927)
+##     No Information Rate : 0.2845          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.9877          
+##  Mcnemar's Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9982   0.9895   0.9922   0.9907   0.9769
+## Specificity            0.9981   0.9983   0.9928   0.9990   0.9998
+## Pos Pred Value         0.9952   0.9930   0.9668   0.9948   0.9991
+## Neg Pred Value         0.9993   0.9975   0.9983   0.9982   0.9948
+## Prevalence             0.2845   0.1935   0.1743   0.1638   0.1839
+## Detection Rate         0.2839   0.1915   0.1730   0.1623   0.1796
+## Detection Prevalence   0.2853   0.1929   0.1789   0.1631   0.1798
+## Balanced Accuracy      0.9982   0.9939   0.9925   0.9948   0.9883
+</code></pre>
+
+<p>As we can see the accuracy is <em>0.9901444</em>.</p>
+
+<p>Now we can go on and use this model to predict future values when given a set of predictors.</p>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/mistirrin/PracticalMachineLearning">Practicalmachinelearning</a> is maintained by <a href="https://github.com/mistirrin">mistirrin</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
+
